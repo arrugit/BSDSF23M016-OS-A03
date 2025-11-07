@@ -62,7 +62,7 @@ char** tokenize(char* cmdline) {
         }
 
         if (len >= ARGLEN)
-            len = ARGLEN - 1;  // prevent overflow
+            len = ARGLEN - 1;
 
         strncpy(arglist[argnum], start, len);
         arglist[argnum][len] = '\0';
@@ -108,18 +108,26 @@ int handle_builtin(char** arglist) {
     // help
     if (strcmp(arglist[0], "help") == 0) {
         printf("Built-in commands:\n");
-        printf("  cd <dir>   Change directory\n");
-        printf("  exit       Exit the shell\n");
-        printf("  help       Show this help message\n");
-        printf("  jobs       List background jobs (not implemented yet)\n");
+        printf("  cd <dir>    Change directory\n");
+        printf("  exit        Exit the shell\n");
+        printf("  help        Show this help message\n");
+        printf("  jobs        List background jobs (not implemented yet)\n");
+        printf("  history     Show recent commands\n");
+        printf("  !n          Re-execute nth command from history\n");
         return 1;
     }
 
-    // jobs (placeholder)
+    // jobs
     if (strcmp(arglist[0], "jobs") == 0) {
         printf("Job control not yet implemented.\n");
         return 1;
     }
 
-    return 0; // not a built-in
+    // history
+    if (strcmp(arglist[0], "history") == 0) {
+        show_history();
+        return 1;
+    }
+
+    return 0;
 }
