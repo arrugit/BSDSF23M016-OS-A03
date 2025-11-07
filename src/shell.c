@@ -1,5 +1,8 @@
 #include "shell.h"
 
+/* -----------------------------------------------------
+   Read command line input from user
+   ----------------------------------------------------- */
 char* read_cmd(char* prompt, FILE* fp) {
     printf("%s", prompt);
     char* cmdline = (char*) malloc(sizeof(char) * MAX_LEN);
@@ -19,7 +22,9 @@ char* read_cmd(char* prompt, FILE* fp) {
     return cmdline;
 }
 
-// ✅ Replace your old tokenize() with this fixed one
+/* -----------------------------------------------------
+   Tokenize input string into arguments
+   ----------------------------------------------------- */
 char** tokenize(char* cmdline) {
     if (cmdline == NULL || cmdline[0] == '\0' || cmdline[0] == '\n') {
         return NULL;
@@ -57,7 +62,7 @@ char** tokenize(char* cmdline) {
         }
 
         if (len >= ARGLEN)
-            len = ARGLEN - 1;
+            len = ARGLEN - 1;  // prevent overflow
 
         strncpy(arglist[argnum], start, len);
         arglist[argnum][len] = '\0';
@@ -72,4 +77,49 @@ char** tokenize(char* cmdline) {
 
     arglist[argnum] = NULL;
     return arglist;
+}
+
+/* -----------------------------------------------------
+   Built-in command handler
+   ----------------------------------------------------- */
+int handle_builtin(char** arglist) {
+    if (arglist == NULL || arglist[0] == NULL)
+        return 0;
+
+    // exit
+    if (strcmp(arglist[0], "exit") == 0) {
+        printf("Exiting shell...\n");
+        exit(0);
+    }
+
+    // cd
+    if (strcmp(arglist[0], "cd") == 0) {
+        char *dir = arglist[1];
+        if (dir == NULL) {
+            dir = getenv("HOME");
+            if (dir == NULL)
+                dir = "/";
+        }
+        if (chdir(dir) != 0)
+            perror("cd");
+        return 1;
+    }
+
+    // help
+    if (strcmp(arglist[0], "help") == 0) {
+        printf("Built-in commands:\n");
+        printf("  cd <dir>   Change directory\n");
+        printf("  exit       Exit the shell\n");
+        printf("  help       Show this help message\n");
+        printf("  jobs       List background jobs (not implemented yet)\n");
+        return 1;
+    }
+
+    // jobs (placeholder)
+    if (strcmp(arglist[0], "jobs") == 0) {
+        printf("Job control not yet implemented.\n");
+        return 1;
+    }
+
+    return 0; // not a built-in
 }
