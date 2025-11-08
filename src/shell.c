@@ -1,5 +1,8 @@
 #include "shell.h"
 
+extern Job jobs[MAX_JOBS];
+extern int job_count;
+
 /* -----------------------------------------------------
    Read command line using GNU Readline
    ----------------------------------------------------- */
@@ -20,14 +23,14 @@ char** tokenize(char* cmdline) {
         return NULL;
 
     char** arglist = (char**)malloc(sizeof(char*) * (MAXARGS + 1));
-    if (arglist == NULL) {
+    if (!arglist) {
         perror("malloc failed");
         exit(1);
     }
 
     for (int i = 0; i < MAXARGS + 1; i++) {
         arglist[i] = (char*)malloc(sizeof(char) * ARGLEN);
-        if (arglist[i] == NULL) {
+        if (!arglist[i]) {
             perror("malloc failed");
             exit(1);
         }
@@ -75,11 +78,12 @@ int handle_builtin(char** arglist) {
 
     if (strcmp(arglist[0], "help") == 0) {
         printf("Built-in commands:\n");
-        printf("  cd <dir>      Change directory\n");
-        printf("  exit          Exit shell\n");
-        printf("  help          Show help message\n");
-        printf("  history       Show history\n");
-        printf("Supports redirection (<, >, >>) and pipes (|)\n");
+        printf("  cd <dir>     Change directory\n");
+        printf("  exit         Exit shell\n");
+        printf("  help         Show help message\n");
+        printf("  history      Show command history\n");
+        printf("  jobs         Show background jobs\n");
+        printf("Supports redirection (<, >, >>), pipes (|), and background (&)\n");
         return 1;
     }
 
@@ -88,6 +92,11 @@ int handle_builtin(char** arglist) {
         if (hist)
             for (int i = 0; hist[i]; i++)
                 printf("%d  %s\n", i + 1, hist[i]->line);
+        return 1;
+    }
+
+    if (strcmp(arglist[0], "jobs") == 0) {
+        list_jobs();
         return 1;
     }
 
@@ -115,4 +124,37 @@ char*** parse_pipeline(char* cmdline, int* cmdcount) {
     }
 
     return cmdlist;
+}
+
+/* -----------------------------------------------------
+   Job management functions
+   ----------------------------------------------------- */
+void add_job(pid_t pid, char* cmd) {
+    if (job_count < MAX_JOBS) {
+        jobs[job_count].pid = pid;
+        strncpy(jobs[job_count].command, cmd, sizeof(jobs[job_count].command) - 1);
+        jobs[job_count].active = 1;
+        printf("[%d] %d  %s\n", job_count + 1, pid, cmd);
+        job_count++;
+    }
+}
+
+void check_background_jobs() {
+    for (int i = 0; i < job_count; i++) {
+        if (jobs[i].active) {
+            int status;
+            pid_t result = waitpid(jobs[i].pid, &status, WNOHANG);
+            if (result != 0) {
+                jobs[i].active = 0;
+                printf("\n[%d] Done  %s\n", i + 1, jobs[i].command);
+            }
+        }
+    }
+}
+
+void list_jobs() {
+    for (int i = 0; i < job_count; i++) {
+        if (jobs[i].active)
+            printf("[%d] Running  %s\n", i + 1, jobs[i].command);
+    }
 }
