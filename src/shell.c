@@ -1,34 +1,23 @@
 #include "shell.h"
 
 /* -----------------------------------------------------
-   Read command line input from user
+   Read command line using GNU Readline
    ----------------------------------------------------- */
-char* read_cmd(char* prompt, FILE* fp) {
-    printf("%s", prompt);
-    char* cmdline = (char*) malloc(sizeof(char) * MAX_LEN);
-    int c, pos = 0;
-
-    while ((c = getc(fp)) != EOF) {
-        if (c == '\n') break;
-        cmdline[pos++] = c;
-    }
-
-    if (c == EOF && pos == 0) {
-        free(cmdline);
-        return NULL; // Handle Ctrl+D
-    }
-
-    cmdline[pos] = '\0';
-    return cmdline;
+char* read_cmd(char* prompt) {
+    char* input = readline(prompt);
+    if (input == NULL) // Ctrl+D
+        return NULL;
+    if (strlen(input) > 0)
+        add_history(input);
+    return input;
 }
 
 /* -----------------------------------------------------
    Tokenize input string into arguments
    ----------------------------------------------------- */
 char** tokenize(char* cmdline) {
-    if (cmdline == NULL || cmdline[0] == '\0' || cmdline[0] == '\n') {
+    if (cmdline == NULL || cmdline[0] == '\0')
         return NULL;
-    }
 
     char** arglist = (char**)malloc(sizeof(char*) * (MAXARGS + 1));
     if (arglist == NULL) {
@@ -45,32 +34,18 @@ char** tokenize(char* cmdline) {
         memset(arglist[i], 0, ARGLEN);
     }
 
-    char* cp = cmdline;
-    char* start;
-    int len;
+    char* token = strtok(cmdline, " \t");
     int argnum = 0;
 
-    while (*cp != '\0' && argnum < MAXARGS) {
-        while (*cp == ' ' || *cp == '\t') cp++;
-        if (*cp == '\0') break;
-
-        start = cp;
-        len = 0;
-        while (*cp != '\0' && *cp != ' ' && *cp != '\t') {
-            cp++;
-            len++;
-        }
-
-        if (len >= ARGLEN)
-            len = ARGLEN - 1;
-
-        strncpy(arglist[argnum], start, len);
-        arglist[argnum][len] = '\0';
+    while (token != NULL && argnum < MAXARGS) {
+        strncpy(arglist[argnum], token, ARGLEN - 1);
         argnum++;
+        token = strtok(NULL, " \t");
     }
 
     if (argnum == 0) {
-        for (int i = 0; i < MAXARGS + 1; i++) free(arglist[i]);
+        for (int i = 0; i < MAXARGS + 1; i++)
+            free(arglist[i]);
         free(arglist);
         return NULL;
     }
@@ -108,12 +83,11 @@ int handle_builtin(char** arglist) {
     // help
     if (strcmp(arglist[0], "help") == 0) {
         printf("Built-in commands:\n");
-        printf("  cd <dir>    Change directory\n");
-        printf("  exit        Exit the shell\n");
-        printf("  help        Show this help message\n");
-        printf("  jobs        List background jobs (not implemented yet)\n");
-        printf("  history     Show recent commands\n");
-        printf("  !n          Re-execute nth command from history\n");
+        printf("  cd <dir>   Change directory\n");
+        printf("  exit       Exit the shell\n");
+        printf("  help       Show this help message\n");
+        printf("  jobs       List background jobs (not implemented yet)\n");
+        printf("  history    Show history (use ↑↓ or !n)\n");
         return 1;
     }
 
@@ -125,7 +99,11 @@ int handle_builtin(char** arglist) {
 
     // history
     if (strcmp(arglist[0], "history") == 0) {
-        show_history();
+        HIST_ENTRY **hist_list = history_list();
+        if (hist_list) {
+            for (int i = 0; hist_list[i]; i++)
+                printf("%d  %s\n", i + 1, hist_list[i]->line);
+        }
         return 1;
     }
 
