@@ -2,15 +2,20 @@
 
 Job jobs[MAX_JOBS];
 int job_count = 0;
+pid_t foreground_pid = -1;
+pid_t shell_pgid = -1;
+struct termios shell_tmodes;
 
 int main() {
     char* cmdline;
     char** arglist;
 
-    signal(SIGCHLD, SIG_IGN); // prevent zombie processes
+    /* initialize shell: put shell in its own pgid, grab terminal, ignore tty stop signals */
+    init_shell();
 
     while (1) {
-        check_background_jobs(); // cleanup finished jobs
+        check_background_jobs();
+
         cmdline = read_cmd(PROMPT);
         if (cmdline == NULL) {
             printf("\n");
@@ -22,12 +27,17 @@ int main() {
             continue;
         }
 
-        add_history(cmdline);
-
+        /* basic background detection */
         int background = 0;
-        if (cmdline[strlen(cmdline) - 1] == '&') {
+        size_t len = strlen(cmdline);
+        if (len > 0 && cmdline[len - 1] == '&') {
             background = 1;
-            cmdline[strlen(cmdline) - 1] = '\0'; // remove '&'
+            /* strip trailing & and any trailing space */
+            cmdline[len - 1] = '\0';
+            while (len > 1 && cmdline[len - 2] == ' ') {
+                cmdline[len - 2] = '\0';
+                len--;
+            }
         }
 
         int cmdcount = 0;
@@ -36,17 +46,19 @@ int main() {
         if (cmdcount > 1) {
             execute_pipeline(cmdlist, cmdcount, background);
             for (int i = 0; i < cmdcount; i++) {
-                for (int j = 0; cmdlist[i][j] != NULL; j++)
-                    free(cmdlist[i][j]);
-                free(cmdlist[i]);
+                if (cmdlist[i]) {
+                    for (int j = 0; cmdlist[i][j] != NULL; j++)
+                        free(cmdlist[i][j]);
+                    free(cmdlist[i]);
+                }
             }
             free(cmdlist);
         } else {
             arglist = tokenize(cmdline);
             if (arglist != NULL) {
-                if (!handle_builtin(arglist))
+                if (!handle_builtin(arglist)) {
                     execute_with_redirection(arglist, background);
-
+                }
                 for (int i = 0; arglist[i] != NULL; i++)
                     free(arglist[i]);
                 free(arglist);

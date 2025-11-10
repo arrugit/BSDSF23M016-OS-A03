@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <termios.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -19,14 +20,21 @@
 #define MAX_PIPE_CMDS 5
 #define MAX_JOBS 50
 
-// Structure for background jobs
 typedef struct {
     pid_t pid;
+    pid_t pgid;
     char command[256];
     int active;
 } Job;
 
-// Function prototypes
+/* global/state */
+extern Job jobs[MAX_JOBS];
+extern int job_count;
+extern pid_t foreground_pid;   /* pid of last foreground process or -1 */
+extern pid_t shell_pgid;       /* shell process group id */
+extern struct termios shell_tmodes;
+
+/* Function prototypes */
 char* read_cmd(char* prompt);
 char** tokenize(char* cmdline);
 int execute(char** arglist);
@@ -34,8 +42,11 @@ int handle_builtin(char** arglist);
 int execute_with_redirection(char** arglist, int background);
 int execute_pipeline(char*** cmdlist, int cmdcount, int background);
 char*** parse_pipeline(char* cmdline, int* cmdcount);
+
 void check_background_jobs();
-void add_job(pid_t pid, char* cmd);
+void add_job(pid_t pid, pid_t pgid, char* cmd);
 void list_jobs();
+void init_shell();                 /* initialize shell process group + terminal */
+void setup_signal_handlers();      /* optional: other signal handlers */
 
 #endif // SHELL_H
