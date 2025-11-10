@@ -10,8 +10,8 @@ int main() {
     char* cmdline;
     char** arglist;
 
-    /* initialize shell: put shell in its own pgid, grab terminal, ignore tty stop signals */
     init_shell();
+    setup_signal_handlers();
 
     while (1) {
         check_background_jobs();
@@ -27,14 +27,19 @@ int main() {
             continue;
         }
 
-        /* basic background detection */
+        /* background detection by trailing & (single command or pipeline) */
         int background = 0;
         size_t len = strlen(cmdline);
+        if (len > 0) {
+            /* strip trailing spaces */
+            while (len > 0 && (cmdline[len - 1] == ' ' || cmdline[len - 1] == '\t'))
+                cmdline[--len] = '\0';
+        }
         if (len > 0 && cmdline[len - 1] == '&') {
             background = 1;
-            /* strip trailing & and any trailing space */
             cmdline[len - 1] = '\0';
-            while (len > 1 && cmdline[len - 2] == ' ') {
+            /* strip trailing spaces again */
+            while (len > 1 && (cmdline[len - 2] == ' ' || cmdline[len - 2] == '\t')) {
                 cmdline[len - 2] = '\0';
                 len--;
             }
@@ -54,8 +59,10 @@ int main() {
             }
             free(cmdlist);
         } else {
+            /* single command */
             arglist = tokenize(cmdline);
             if (arglist != NULL) {
+                /* builtins (fg/bg/jobs/cd/exit/help/history) */
                 if (!handle_builtin(arglist)) {
                     execute_with_redirection(arglist, background);
                 }

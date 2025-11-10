@@ -15,38 +15,49 @@
 #include <readline/history.h>
 
 #define MAXARGS 10
-#define ARGLEN 30
+#define ARGLEN 256
 #define PROMPT "FCIT> "
-#define MAX_PIPE_CMDS 5
-#define MAX_JOBS 50
+#define MAX_PIPE_CMDS 10
+#define MAX_JOBS 128
+
+typedef enum { JOB_RUNNING = 0, JOB_STOPPED = 1, JOB_DONE = 2 } JobStatus;
 
 typedef struct {
-    pid_t pid;
-    pid_t pgid;
-    char command[256];
-    int active;
+    pid_t pid;           /* last pid in the job (useful for reporting) */
+    pid_t pgid;          /* process group id for the job */
+    char command[512];   /* textual command */
+    JobStatus status;    /* running / stopped / done */
+    int active;          /* 1 = active (running or stopped), 0 = removed/done */
 } Job;
 
-/* global/state */
+/* Global state (defined in main.c) */
 extern Job jobs[MAX_JOBS];
 extern int job_count;
-extern pid_t foreground_pid;   /* pid of last foreground process or -1 */
-extern pid_t shell_pgid;       /* shell process group id */
+extern pid_t foreground_pid;   /* pid of last foreground process (for compatibility) */
+extern pid_t shell_pgid;       /* shell pgid */
 extern struct termios shell_tmodes;
 
-/* Function prototypes */
+/* I/O and parsing */
 char* read_cmd(char* prompt);
 char** tokenize(char* cmdline);
-int execute(char** arglist);
-int handle_builtin(char** arglist);
-int execute_with_redirection(char** arglist, int background);
-int execute_pipeline(char*** cmdlist, int cmdcount, int background);
 char*** parse_pipeline(char* cmdline, int* cmdcount);
 
+/* Execution */
+int execute_with_redirection(char** arglist, int background);
+int execute_pipeline(char*** cmdlist, int cmdcount, int background);
+
+/* Builtins / job control */
+int handle_builtin(char** arglist);
+void add_job(pid_t pid, pid_t pgid, const char* cmd, JobStatus status);
 void check_background_jobs();
-void add_job(pid_t pid, pid_t pgid, char* cmd);
 void list_jobs();
-void init_shell();                 /* initialize shell process group + terminal */
-void setup_signal_handlers();      /* optional: other signal handlers */
+int job_index_from_token(const char* tok); /* helper to parse %n or number */
+int find_job_by_index(int idx); /* index is 1-based */
+int fg_builtin(int job_index);
+int bg_builtin(int job_index);
+
+/* Initialization */
+void init_shell();
+void setup_signal_handlers();
 
 #endif // SHELL_H
